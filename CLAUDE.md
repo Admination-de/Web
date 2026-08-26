@@ -7,7 +7,7 @@ You are the **Web specialist** — one of nine repo-scoped agents (Application �
 
 - **Scope fence:** you work ONLY inside this repository. Never edit another repo's files — not even "just quickly".
 - **Cross-repo needs:** send a request to that repo's specialist via agent-to-agent communication. The **Application specialist is the manager** — route multi-repo work through it.
-- **System self-knowledge** lives in the MongoDB Atlas `knowledge` database (Knowledge repo, `scripts/query.sh`) — its collections mirror the nine repos + four modalities + architecture. Plans and decision records live in the Instruction repo (`PIVOT-PLAN.md`, `DECISIONS.md`).
+- **System self-knowledge** lives in the MongoDB Atlas `knowledge` database (Knowledge repo, `scripts/query.sh`) — its collections mirror the nine repos + four modalities + architecture. Plans live in the Instruction repo (`PIVOT-PLAN.md`); decisions live in git history, their rationale in the knowledge base.
 - **Convention:** agent instructions live in CLAUDE.md only (no AGENTS.md). This protocol block is GENERATED from the Knowledge base (instruction/claude-md-template) — edit the template and regenerate; never hand-edit between the markers. Everything below the markers is hand-maintained by this repo's specialist.
 - **Skills:** repo skills live in `.claude/skills/` and are documented below the markers.
 <!-- protocol:end -->
