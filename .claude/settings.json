@@ -1,0 +1,19 @@
+{
+  "extraKnownMarketplaces": {
+    "admination": {
+      "source": {
+        "source": "github",
+        "repo": "Admination-de/Application"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "admination@admination": true
+  },
+  "permissions": {
+    "deny": [
+      "Bash(rm -rf /*)",
+      "Bash(git push --force*)"
+    ]
+  }
+}
