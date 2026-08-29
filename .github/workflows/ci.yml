@@ -29,11 +29,13 @@ jobs:
   # -> npm run build:css). If this fails, the deploy fails; nothing else about
   # the PR matters until it passes.
   #
-  # `npm install`, not `npm ci`: package-lock.json is gitignored in this repo, so
-  # there is no lockfile to install from. That means CI resolves dependencies
-  # freshly on every run and an upstream release can turn this job red without a
-  # commit — the same exposure the Vercel build already has. Committing the
-  # lockfile would close it; that is a repo decision, not a CI one.
+  # `npm ci`, not `npm install`: package-lock.json is committed, so the whole
+  # dependency tree is pinned and an upstream release can no longer turn this job
+  # red without a commit. npm ci is also strictly the stricter of the two — it
+  # installs the lockfile exactly and FAILS if package.json and the lockfile have
+  # drifted apart, which npm install would silently reconcile by rewriting the
+  # lockfile. That drift check is the point: it stabilises this gate's contract
+  # (knowledge: architecture/gate-contract-stability).
   # ---------------------------------------------------------------------------
   site-build:
     name: site-build
@@ -45,10 +47,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          # no `cache: npm` — that requires a lockfile, and this repo gitignores it.
+          # `cache: npm` is now possible (the lockfile is committed) but deliberately
+          # not enabled here — a cache is a second input to the gate, and adding one
+          # belongs in its own reviewed change, not in the switch to npm ci.
 
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
+      - name: Install dependencies (from the committed lockfile)
+        run: npm ci --no-audit --no-fund
 
       - name: Build the site (the command Vercel runs)
         run: npm run build:css
