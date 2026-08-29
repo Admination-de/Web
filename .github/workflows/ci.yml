@@ -1,8 +1,8 @@
 name: CI
 
 # Web is the PUBLIC website — lower-interior slot of the Architecture Grid
-# (deployment-world; triple Web / .html / Vercel), primary format .html, mode
-# strict (knowledge: architecture/format-law, application.web/identity).
+# (deployment-world; triple Web / .html / Vercel), primary formats .html and
+# .css, mode strict (knowledge: architecture/format-law, application.web/identity).
 #
 # The repo carries no test framework and must not grow one. Its real gate is the
 # same command Vercel runs on every deploy (vercel.json buildCommand), plus the
@@ -220,20 +220,35 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # Server-side mirror of the plugin PreToolUse hook `format-law.sh`
-  # (knowledge: architecture/format-law). Web's law: primary format .html, mode
-  # strict. Application rules from the same document: creation is policed, edits
-  # are not, existing files grandfathered — hence --diff-filter=AR.
+  # (knowledge: architecture/format-law). Web's law: primary formats .html and
+  # .css, mode strict, plus the named file tailwind.config.js. Application rules
+  # from the same document: creation is policed, edits are not, existing files
+  # grandfathered — hence --diff-filter=AR.
   #
-  # Grandfathered by that rule, and deliberately NOT allowanced here: this repo's
-  # existing .js/.css/.ico machinery (tailwind.config.js, css/tailwind.css,
-  # css/main.css, public/favicon.ico). They predate the law and stay; a NEW file
-  # of those types is a violation the hook would deny at the keyboard, and this
-  # job denies it at the PR.
+  # DELIBERATE LOOSENING (2026-08-29). The three allowance arms below — .css,
+  # tailwind.config.js and .github/CODEOWNERS — make this gate strictly LESS
+  # strict than it was. That is the point, and it is disclosed rather than
+  # smuggled in: this job had drifted BEHIND the law it mirrors. The hook reads
+  # architecture.json live and already allowed all three, while this job's
+  # hardcoded copy still rejected them — so the keyboard said yes and the PR said
+  # no. The comment that used to sit here asserted the opposite ("the hook denies
+  # extensionless files under .github/, the ruling is pending"); both halves were
+  # false by then. Authorised by Knowledge 1514d3a (2026-08-28, architect
+  # ruling): seed architecture.json, format-law doc — universal_allowances.files
+  # gained the .github/ platform-convention entry, and per_repo.Web became
+  # formats [.html, .css] + files [tailwind.config.js].
   #
-  # NOTE: .github/CODEOWNERS deliberately has NO allowance here. The hook denies
-  # extensionless files under .github/ and the widening ruling is still pending
-  # with the architect; when it lands, the allowance and the file arrive in one
-  # commit together.
+  # The loosening is BOUNDED to that policy text, mirroring path-policy.sh arm
+  # for arm rather than approximating it. In particular CODEOWNERS is keyed on
+  # the exact NAME under a .github/ directory — NOT on "extensionless files under
+  # .github/". .github/FOOBAR, .github/codeowners (case) and a root-level
+  # CODEOWNERS all remain violations. .js as a class remains a violation too;
+  # only the single named file tailwind.config.js is allowed.
+  #
+  # Still grandfathered rather than allowanced, because the law polices creation
+  # and not edits: css/tailwind.css and css/main.css (now also covered by the
+  # .css arm) and public/favicon.ico (not covered — a NEW .ico outside an
+  # allowanced asset path is still a violation).
   # ---------------------------------------------------------------------------
   format-law:
     name: format-law
@@ -303,6 +318,21 @@ jobs:
               esac
             fi
 
+            # Well-known extensionless GitHub platform-convention files under
+            # .github/ — CODEOWNERS by exact, case-sensitive name. Mirrors the
+            # files[] arm of pp_universal_allow_policy: the path test and the
+            # basename test must BOTH hold, so this admits .github/CODEOWNERS and
+            # nothing else.
+            if [ "$pass" -eq 0 ]; then
+              case "$path" in
+                .github/*|*/.github/*)
+                  case "$filename" in
+                    CODEOWNERS) pass=1 ;;
+                  esac
+                  ;;
+              esac
+            fi
+
             # .spec (Testing corner)
             if [ "$pass" -eq 0 ]; then
               case "$filename" in
@@ -324,8 +354,19 @@ jobs:
               esac
             fi
 
-            # --- per-repo primary format: .html ---
-            [ "$pass" -eq 0 ] && [ "$lower_ext" = ".html" ] && pass=1
+            # --- per-repo primary formats: .html, .css ---
+            if [ "$pass" -eq 0 ]; then
+              case "$lower_ext" in .html|.css) pass=1 ;; esac
+            fi
+
+            # --- per-repo named files: exact, case-sensitive basename, no globs.
+            # Mirrors repo_law.files in pp_format_law_decision. Deliberately a
+            # single name and NOT a blanket .js allowance.
+            if [ "$pass" -eq 0 ]; then
+              case "$filename" in
+                tailwind.config.js) pass=1 ;;
+              esac
+            fi
 
             [ "$pass" -eq 0 ] && violations+=("$path")
           done < <(git diff -z --name-only --diff-filter=AR "$BASE_SHA" "$HEAD_SHA")
@@ -334,11 +375,11 @@ jobs:
             for v in "${violations[@]}"; do
               echo "::error::format-law violation: $v"
             done
-            echo "Web's primary format is [.html] (mode: strict), plus the universal allowances — knowledge: architecture/format-law."
+            echo "Web's primary formats are [.html, .css] (mode: strict), plus tailwind.config.js and the universal allowances — knowledge: architecture/format-law."
             exit 1
           fi
 
-          echo "format-law: every newly added file is .html or covered by a universal allowance."
+          echo "format-law: every newly added file is .html/.css, a per-repo named file, or covered by a universal allowance."
 
   # ---------------------------------------------------------------------------
   # Scope fence, server side. The eight sibling repos are never vendored here;
