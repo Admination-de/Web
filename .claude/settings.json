@@ -8,7 +8,9 @@
     }
   },
   "enabledPlugins": {
-    "admination@admination": true
+    "admination@admination": true,
+    "fable-foreman@fable-foreman": false,
+    "fable-foreman-on-steroids@fable-foreman-on-steroids": false
   },
   "permissions": {
     "deny": [
