@@ -11,7 +11,7 @@ name: CI
 # workflow enforces. bash, node and python3 all ship on the ubuntu-latest image.
 #
 # Check names (these feed the branch-protection required-checks list):
-#   site-build · html-gate · format-law · repo-fence · hygiene
+#   site-build · html-gate · format-law · repo-fence · hygiene · protocol-gate
 
 on:
   pull_request:
@@ -463,3 +463,66 @@ jobs:
             fi
           done
           exit "$fail"
+
+  # ---------------------------------------------------------------------------
+  # First pilot of the central-instruction symlink pattern (Instruction repo,
+  # agent/Web.md). This repo no longer carries its own CLAUDE.md: the
+  # specialist protocol is now a single tracked SYMLINK entry,
+  # .claude/rules/protocol.md, pointing at the central source of truth. The
+  # runner here clones ONLY this repo, so that link is DANGLING on CI by
+  # design — this job validates the LINK ENTRY itself (git's stored mode and
+  # target string), never resolves or reads through it.
+  # ---------------------------------------------------------------------------
+  protocol-gate:
+    name: protocol-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: No CLAUDE.md file anywhere in the tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          hits="$(git ls-files '*CLAUDE.md' 'CLAUDE.md' || true)"
+          if [ -n "$hits" ]; then
+            echo "::error::CLAUDE.md is tracked in this repo — the protocol now lives only at the central source (Instruction repo, agent/Web.md), reached via .claude/rules/protocol.md:"
+            printf '%s\n' "$hits"
+            exit 1
+          fi
+          echo "protocol-gate: no CLAUDE.md tracked."
+
+      - name: No AGENTS.md file anywhere in the tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          hits="$(git ls-files '*AGENTS.md' 'AGENTS.md' || true)"
+          if [ -n "$hits" ]; then
+            echo "::error::AGENTS.md is tracked in this repo — agent instructions live in the protocol source only, never in a second file:"
+            printf '%s\n' "$hits"
+            exit 1
+          fi
+          echo "protocol-gate: no AGENTS.md tracked."
+
+      - name: .claude/rules/protocol.md is a symlink to the central source
+        shell: bash
+        run: |
+          set -euo pipefail
+          want_target='../../../../Architecture/Instruction/agent/Web.md'
+          entry="$(git ls-files -s .claude/rules/protocol.md)"
+          if [ -z "$entry" ]; then
+            echo "::error::.claude/rules/protocol.md is not tracked — the protocol link is missing."
+            exit 1
+          fi
+          mode="$(printf '%s' "$entry" | awk '{print $1}')"
+          blob="$(printf '%s' "$entry" | awk '{print $2}')"
+          if [ "$mode" != "120000" ]; then
+            echo "::error::.claude/rules/protocol.md is tracked with mode $mode, not 120000 (symlink) — it must be a symlink entry, not a real file."
+            exit 1
+          fi
+          target="$(git cat-file blob "$blob")"
+          if [ "$target" != "$want_target" ]; then
+            echo "::error::.claude/rules/protocol.md points at '$target', expected '$want_target'."
+            exit 1
+          fi
+          echo "protocol-gate: .claude/rules/protocol.md is a symlink (mode 120000) targeting $want_target."
