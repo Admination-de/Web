@@ -465,13 +465,18 @@ jobs:
           exit "$fail"
 
   # ---------------------------------------------------------------------------
-  # First pilot of the central-instruction symlink pattern (Instruction repo,
-  # agent/Web.md). This repo no longer carries its own CLAUDE.md: the
-  # specialist protocol is now a single tracked SYMLINK entry,
-  # .claude/rules/protocol.md, pointing at the central source of truth. The
-  # runner here clones ONLY this repo, so that link is DANGLING on CI by
-  # design — this job validates the LINK ENTRY itself (git's stored mode and
-  # target string), never resolves or reads through it.
+  # Pilot of the central-instruction @import pattern (Instruction repo,
+  # agent/Web.md). The prior approach — a tracked SYMLINK entry at
+  # .claude/rules/protocol.md pointing outside the repo root — is silently
+  # skipped by Claude Code 2.1.263: measured headless with canary tokens and
+  # confirmed interactively (no approval dialog offered, rule absent from
+  # context). The working mechanism is a one-line root CLAUDE.md using
+  # Claude Code's documented `@import` syntax: it triggers the "Allow
+  # external CLAUDE.md file imports?" dialog naming the exact target, and
+  # once approved the session reads the real protocol at
+  # Instruction/agent/Web.md. This job validates that CLAUDE.md is a real,
+  # exact-content file (never a symlink) and that no second instruction file
+  # (AGENTS.md or the removed protocol.md symlink) is tracked alongside it.
   # ---------------------------------------------------------------------------
   protocol-gate:
     name: protocol-gate
@@ -480,23 +485,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: No CLAUDE.md file anywhere in the tree
+      - name: CLAUDE.md is a real file with exactly the expected import line
         shell: bash
         run: |
           set -euo pipefail
-          hits="$(git ls-files '*CLAUDE.md' 'CLAUDE.md' || true)"
-          if [ -n "$hits" ]; then
-            echo "::error::CLAUDE.md is tracked in this repo — the protocol now lives only at the central source (Instruction repo, agent/Web.md), reached via .claude/rules/protocol.md:"
-            printf '%s\n' "$hits"
+          if [ ! -f CLAUDE.md ]; then
+            echo "::error::CLAUDE.md is missing at the repo root — the protocol is reached via a one-line @import there."
             exit 1
           fi
-          echo "protocol-gate: no CLAUDE.md tracked."
+          if [ -L CLAUDE.md ]; then
+            echo "::error::CLAUDE.md is a symlink — it must be a real file containing the @import line, not a link."
+            exit 1
+          fi
+          if ! printf '%s\n' '@../../Architecture/Instruction/agent/Web.md' | cmp -s - CLAUDE.md; then
+            echo "::error::CLAUDE.md does not contain exactly the expected import line '@../../Architecture/Instruction/agent/Web.md' plus a trailing newline, and nothing else."
+            exit 1
+          fi
+          echo "protocol-gate: CLAUDE.md is a real file with exactly the expected @import line."
 
       - name: No AGENTS.md file anywhere in the tree
         shell: bash
         run: |
           set -euo pipefail
-          hits="$(git ls-files '*AGENTS.md' 'AGENTS.md' || true)"
+          hits="$(git ls-files | grep -x 'AGENTS.md' || true)"
           if [ -n "$hits" ]; then
             echo "::error::AGENTS.md is tracked in this repo — agent instructions live in the protocol source only, never in a second file:"
             printf '%s\n' "$hits"
@@ -504,25 +515,13 @@ jobs:
           fi
           echo "protocol-gate: no AGENTS.md tracked."
 
-      - name: .claude/rules/protocol.md is a symlink to the central source
+      - name: No leftover .claude/rules/protocol.md symlink
         shell: bash
         run: |
           set -euo pipefail
-          want_target='../../../../Architecture/Instruction/agent/Web.md'
-          entry="$(git ls-files -s .claude/rules/protocol.md)"
-          if [ -z "$entry" ]; then
-            echo "::error::.claude/rules/protocol.md is not tracked — the protocol link is missing."
+          hits="$(git ls-files | grep -x '.claude/rules/protocol.md' || true)"
+          if [ -n "$hits" ]; then
+            echo "::error::.claude/rules/protocol.md is still tracked — the protocol is now reached via the root CLAUDE.md @import, not a symlink."
             exit 1
           fi
-          mode="$(printf '%s' "$entry" | awk '{print $1}')"
-          blob="$(printf '%s' "$entry" | awk '{print $2}')"
-          if [ "$mode" != "120000" ]; then
-            echo "::error::.claude/rules/protocol.md is tracked with mode $mode, not 120000 (symlink) — it must be a symlink entry, not a real file."
-            exit 1
-          fi
-          target="$(git cat-file blob "$blob")"
-          if [ "$target" != "$want_target" ]; then
-            echo "::error::.claude/rules/protocol.md points at '$target', expected '$want_target'."
-            exit 1
-          fi
-          echo "protocol-gate: .claude/rules/protocol.md is a symlink (mode 120000) targeting $want_target."
+          echo "protocol-gate: .claude/rules/protocol.md is not tracked."
