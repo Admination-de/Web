@@ -425,6 +425,11 @@ jobs:
 
           exit "$fail"
 
+  # Web is a PUBLIC repository. GitHub does not let a public repo's workflow call
+  # a reusable workflow that lives in a PRIVATE repo, and Architecture is private
+  # (measured 2026-09-07: callers were rejected at parse time). So the fleet
+  # gates stay INLINE here until Architecture publishes them from a public repo;
+  # the other nine repos call gate-protocol.yml / gate-hygiene.yml.
   # ---------------------------------------------------------------------------
   # Junk and secret-bearing files must never enter history — checked against the
   # whole tracked tree, not only the diff, so this cannot rot back in silently.
