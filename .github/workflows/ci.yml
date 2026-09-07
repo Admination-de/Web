@@ -425,116 +425,12 @@ jobs:
 
           exit "$fail"
 
-  # ---------------------------------------------------------------------------
-  # Junk and secret-bearing files must never enter history — checked against the
-  # whole tracked tree, not only the diff, so this cannot rot back in silently.
-  # This repo is PUBLIC: a committed .env is a disclosed credential, not a mess.
-  # ---------------------------------------------------------------------------
-  hygiene:
-    name: hygiene
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: No .DS_Store, node_modules or .env in the tree
-        shell: bash
-        run: |
-          set -euo pipefail
-          JUNK='(^|/)(\.DS_Store|node_modules/|\.env(\.[A-Za-z0-9_.-]+)?$)'
-          hits="$(git ls-files | grep -E "$JUNK" || true)"
-          if [ -n "$hits" ]; then
-            echo "::error::junk or secret-bearing files are tracked in this repo:"
-            printf '%s\n' "$hits"
-            echo "Remove them with 'git rm --cached <path>' and add them to .gitignore."
-            exit 1
-          fi
-          echo "hygiene: no .DS_Store, node_modules or .env in the tracked tree."
-
-      - name: .gitignore still covers them
-        shell: bash
-        run: |
-          set -euo pipefail
-          fail=0
-          for pattern in .DS_Store node_modules; do
-            if ! grep -qxF "$pattern" .gitignore; then
-              echo "::error file=.gitignore::'$pattern' is no longer ignored — that is how it gets committed next time."
-              fail=1
-            fi
-          done
-          exit "$fail"
-
-  # ---------------------------------------------------------------------------
-  # Pilot of the central-instruction @import pattern (Instruction repo,
-  # agent/Web.md). The prior approach — a tracked SYMLINK entry at
-  # .claude/rules/protocol.md pointing outside the repo root — is silently
-  # skipped by Claude Code 2.1.263: measured headless with canary tokens and
-  # confirmed interactively (no approval dialog offered, rule absent from
-  # context). The working mechanism is a one-line root CLAUDE.md using
-  # Claude Code's documented `@import` syntax: it triggers the "Allow
-  # external CLAUDE.md file imports?" dialog naming the exact target, and
-  # once approved the session reads the real protocol at
-  # Instruction/agent/Web.md. This job validates that CLAUDE.md is a real,
-  # exact-content file (never a symlink) and that no second instruction file
-  # — an AGENTS.md at any depth, a nested CLAUDE.md other than the root one,
-  # or the removed protocol.md symlink — is tracked alongside it.
-  # ---------------------------------------------------------------------------
+  # protocol-gate and hygiene are now reusable callers into Architecture,
+  # which owns the rule text for both. Required check names accordingly
+  # become `protocol-gate / gate` and `hygiene / gate`.
   protocol-gate:
     name: protocol-gate
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: CLAUDE.md is a real file with exactly the expected import line
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ ! -f CLAUDE.md ]; then
-            echo "::error::CLAUDE.md is missing at the repo root — the protocol is reached via a one-line @import there."
-            exit 1
-          fi
-          if [ -L CLAUDE.md ]; then
-            echo "::error::CLAUDE.md is a symlink — it must be a real file containing the @import line, not a link."
-            exit 1
-          fi
-          if ! printf '%s\n' '@../../Architecture/Instruction/agent/Web.md' | cmp -s - CLAUDE.md; then
-            echo "::error::CLAUDE.md does not contain exactly the expected import line '@../../Architecture/Instruction/agent/Web.md' plus a trailing newline, and nothing else."
-            exit 1
-          fi
-          echo "protocol-gate: CLAUDE.md is a real file with exactly the expected @import line."
-
-      - name: No AGENTS.md file anywhere in the tree
-        shell: bash
-        run: |
-          set -euo pipefail
-          hits="$(git ls-files | grep -E '(^|/)AGENTS\.md$' || true)"
-          if [ -n "$hits" ]; then
-            echo "::error::AGENTS.md is tracked in this repo — agent instructions live in the protocol source only, never in a second file:"
-            printf '%s\n' "$hits"
-            exit 1
-          fi
-          echo "protocol-gate: no AGENTS.md tracked."
-
-      - name: No CLAUDE.md other than the root one
-        shell: bash
-        run: |
-          set -euo pipefail
-          hits="$(git ls-files | grep -E '(^|/)CLAUDE\.md$' | grep -vx 'CLAUDE.md' || true)"
-          if [ -n "$hits" ]; then
-            echo "::error::A nested CLAUDE.md is tracked — instructions come only from the root CLAUDE.md's one-line @import, never a second file at any depth:"
-            printf '%s\n' "$hits"
-            exit 1
-          fi
-          echo "protocol-gate: no nested CLAUDE.md tracked."
-
-      - name: No leftover .claude/rules/protocol.md symlink
-        shell: bash
-        run: |
-          set -euo pipefail
-          hits="$(git ls-files | grep -Fx '.claude/rules/protocol.md' || true)"
-          if [ -n "$hits" ]; then
-            echo "::error::.claude/rules/protocol.md is still tracked — the protocol is now reached via the root CLAUDE.md @import, not a symlink."
-            exit 1
-          fi
-          echo "protocol-gate: .claude/rules/protocol.md is not tracked."
+    uses: Admination-de/Architecture/.github/workflows/gate-protocol.yml@staging
+  hygiene:
+    name: hygiene
+    uses: Admination-de/Architecture/.github/workflows/gate-hygiene.yml@staging
