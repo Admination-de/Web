@@ -403,7 +403,7 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          SIBLINGS='^(Application|Function|Interaction|Verification|Data|Knowledge|Contract|Instruction)/'
+          SIBLINGS='^(Handler|Interface|Data|Compute|Generation|Storage|Plugin|Knowledge|Verification|Instruction|Contract|Templates|Web)/'
           fail=0
 
           added="$(git diff --name-only --diff-filter=AR "$BASE_SHA" "$HEAD_SHA" || true)"
@@ -503,8 +503,8 @@ jobs:
             echo "::error::CLAUDE.md is a symlink — it must be a real file containing the @import line, not a link."
             exit 1
           fi
-          if ! printf '%s\n' '@../../Architecture/Instruction/agent/Web.md' | cmp -s - CLAUDE.md; then
-            echo "::error::CLAUDE.md does not contain exactly the expected import line '@../../Architecture/Instruction/agent/Web.md' plus a trailing newline, and nothing else."
+          if ! printf '%s\n' '@../../Operation/Instruction/agent/Web.md' | cmp -s - CLAUDE.md; then
+            echo "::error::CLAUDE.md does not contain exactly the expected import line '@../../Operation/Instruction/agent/Web.md' plus a trailing newline, and nothing else."
             exit 1
           fi
           echo "protocol-gate: CLAUDE.md is a real file with exactly the expected @import line."
