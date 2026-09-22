@@ -99,6 +99,7 @@
 <p>Die Website auto-azav.de selbst wird als statische Seite über das Content-Delivery-Netzwerk von Scaleway (Edge Services) ausgeliefert; die dabei anfallenden technisch notwendigen Zugriffsdaten (z. B. IP-Adressen) werden innerhalb der EU verarbeitet. Bei Nutzung der Terminbuchung werden die von Ihnen eingegebenen Daten (Name, E-Mail, Terminwunsch) durch Calendly LLC (USA) verarbeitet.</p>
 <p>Die Übermittlung von Terminbuchungsdaten an die Calendly LLC (USA) stützt sich auf den Angemessenheitsbeschluss der EU-Kommission zum EU-US Data Privacy Framework (Art. 45 DSGVO); Calendly ist unter dem DPF zertifiziert. Ergänzend gelten EU-Standardvertragsklauseln (Art. 46 Abs. 2 lit. c DSGVO).</p>
 <p>Scaleway SAS ist ein Unternehmen mit Sitz in Frankreich; sämtliche von Scaleway für die von uns genutzten Dienste veröffentlichten Unterauftragnehmer verarbeiten ausschließlich innerhalb der Europäischen Union, Betreiber der Rechenzentren der Region Paris ist die OpCore (Frankreich). Eine Übermittlung personenbezogener Daten in Drittstaaten findet bei Scaleway nicht statt.</p>
+<p>Weder die Admination UG noch die Scaleway SAS noch die OpCore unterliegen der Gerichtsbarkeit der Vereinigten Staaten von Amerika. Der US CLOUD Act (18 U.S.C. § 2713), der US-Behörden den Zugriff auf Daten bei Anbietern unter US-Gerichtsbarkeit auch außerhalb der USA erlaubt, findet auf die Verarbeitung Ihrer Daten in unserer Anwendung daher keine Anwendung. Herausgabeverlangen von Behörden oder Gerichten aus Drittstaaten befolgen wir ausschließlich auf Grundlage einer internationalen Übereinkunft im Sinne des Art. 48 DSGVO.</p>
 <h2>Aufbewahrungsfristen</h2>
 <p>Wir speichern Ihre personenbezogenen Daten nur so lange, wie es für die Erfüllung des jeweiligen Verarbeitungszwecks erforderlich ist oder gesetzliche Aufbewahrungspflichten bestehen:</p>
 <ul>
@@ -128,7 +129,11 @@
     </li>
 <li><strong>Mandantentrennung:</strong> Strikte Datenisolierung durch PostgreSQL Row Level Security (RLS) auf Datenbankebene; Dokumentzugriff ausschließlich über die Anwendung nach Berechtigungsprüfung.
     </li>
-<li><strong>Zugangssicherheit:</strong> Anmeldung ausschließlich per SSO/OAuth (Google Login) – kein eigener Passwortspeicher; Multi-Faktor-Authentifizierung (MFA) für alle administrativen Zugänge.
+<li><strong>Zugangssicherheit:</strong> Anmeldung ausschließlich mit der dienstlichen E-Mail-Adresse beim jeweiligen Bildungsträger, kein Identitätsanbieter außerhalb der EU; Multi-Faktor-Authentifizierung (MFA) für alle administrativen Zugänge.
+    </li>
+<li><strong>KI-Verordnung:</strong> Die Admination UG ist Anbieterin der in der Anwendung eingesetzten KI-Systeme (Art. 3 Nr. 3 Verordnung (EU) 2024/1689); sie dienen ausschließlich der Dokumentation (Extraktion, Texterkennung, Transkription, Textentwürfe), sind keine Hochrisiko-KI-Systeme nach Anhang III, jede Ausgabe wird von einer Fachkraft geprüft, es finden keine automatisierten Entscheidungen im Einzelfall (Art. 22 DSGVO) statt und Ihre Daten werden nicht zum Training von KI-Modellen verwendet.
+    </li>
+<li><strong>Kein US CLOUD Act:</strong> Kein an der Verarbeitung beteiligtes Unternehmen unterliegt der Gerichtsbarkeit der Vereinigten Staaten; die Herausgabepflicht nach 18 U.S.C. § 2713 (CLOUD Act) trifft keine Stelle im Datenpfad der Anwendung.
     </li>
 <li><strong>Least Privilege:</strong> Eingeschränkte Datenbankrolle für die Anwendung, getrennte Administratorrolle für Migrationen; getrennte Staging- und Produktionsumgebungen als eigene Cloud-Projekte; Schema- und Zugriffsregeln versioniert als Code mit automatisierter CI-Prüfung.
     </li>
