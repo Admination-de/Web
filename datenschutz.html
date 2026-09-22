@@ -76,9 +76,7 @@
 <h2>Hosting &amp; Infrastruktur der Softwarelösung (Auftragsverarbeiter)</h2>
 <p>Für den Betrieb unserer Software „AutoAZAV“nutzen wir technische Dienstleister für Hosting, Datenbanken und Dokumentenverarbeitung. Mit allen besteht ein Auftragsverarbeitungsvertrag nach Art. 28 DSGVO.</p>
 <ol type="a">
-    <li><strong>Scaleway SAS</strong> (Paris, Frankreich): Betrieb der gesamten Anwendungsinfrastruktur -- Hosting der Anwendung (Serverless Containers), verwaltete PostgreSQL-Datenbank, Objektspeicher für Dokumente, Auslieferung und TLS-Terminierung (Edge Services), Monitoring sowie Versand transaktionaler E-Mails. Verarbeitungsort: Region Paris (<code>fr-par</code>) -- Rechenzentren DC2 und DC3 in Vitry-sur-Seine, DC5 in Saint-Ouen-l’Aumône und DC4 in Paris, Frankreich. <em>Transfergrundlage:</em> keine Drittlandübermittlung; Auftragsverarbeitungsvertrag (Data Processing Agreement) des Anbieters ist Vertragsbestandteil; Scaleway ist nach ISO/IEC 27001 zertifiziert.
-    </li>
-<li><strong>Mistral AI SAS</strong> (Paris, Frankreich): KI-gestützte Dokumentenextraktion und Texterkennung. Verarbeitungsort: Europäische Union (Standard-Endpunkt des Anbieters; kein US-Endpunkt). <em>Transfergrundlage:</em> Auftragsverarbeitungsvertrag (Data Processing Addendum) des Anbieters ist Vertragsbestandteil; soweit der Anbieter für einzelne Funktionen Unterauftragnehmer außerhalb der EU einsetzt, stützt sich dies auf EU-Standardvertragsklauseln (Art. 46 Abs. 2 lit. c DSGVO); die Nutzung der übermittelten Daten zum Training von KI-Modellen ist deaktiviert, Ein- und Ausgaben werden nicht über die Beantwortung der Anfrage hinaus gespeichert (Zero Data Retention).
+    <li><strong>Scaleway SAS</strong> (Paris, Frankreich): Betrieb der gesamten Anwendungsinfrastruktur -- Hosting der Anwendung (Serverless Containers), verwaltete PostgreSQL-Datenbank, Objektspeicher für Dokumente, Auslieferung und TLS-Terminierung (Edge Services), Monitoring, Versand transaktionaler E-Mails sowie KI-gestützte Dokumentenextraktion und Texterkennung (Generative APIs). Verarbeitungsort: Region Paris (<code>fr-par</code>) -- Rechenzentren DC2 und DC3 in Vitry-sur-Seine, DC5 in Saint-Ouen-l’Aumône und DC4 in Paris, Frankreich; die KI-Modelle werden in einem Rechenzentrum in Paris betrieben. <em>Transfergrundlage:</em> keine Drittlandübermittlung; Auftragsverarbeitungsvertrag (Data Processing Agreement) des Anbieters ist Vertragsbestandteil; Scaleway ist nach ISO/IEC 27001 zertifiziert. Für die Generative APIs gilt nach den Zusicherungen des Anbieters Zero Data Retention: Ein- und Ausgaben werden nicht gespeichert, nicht gelesen und nicht zum Training von KI-Modellen verwendet.
 </li>
 </ol>
 <p><strong>Automatisierte Entscheidungsfindung:</strong> Es findet keine automatisierte Entscheidungsfindung oder Profiling gemäß Art. 22 DSGVO statt.</p>
@@ -86,8 +84,7 @@
 <p>Wir setzen folgende Drittanbieter zur Erbringung unseres Dienstes ein:</p>
 <table>
 <tr><th>Anbieter</th><th>Zweck</th><th>Standort</th><th>Datenschutz</th></tr>
-<tr><td>Scaleway SAS</td><td>Hosting der Website und der Anwendung, Datenbank, Dateispeicher, E-Mail-Versand</td><td>Paris (FR)</td><td><a href="https://www.scaleway.com/en/privacy-policy/" target="_blank" rel="noopener">scaleway.com/en/privacy-policy</a></td></tr>
-<tr><td>Mistral AI SAS</td><td>KI-Dokumentenverarbeitung (Extraktion &amp; Texterkennung)</td><td>EU</td><td><a href="https://legal.mistral.ai/terms/privacy-policy" target="_blank" rel="noopener">legal.mistral.ai/terms/privacy-policy</a></td></tr>
+<tr><td>Scaleway SAS</td><td>Hosting der Website und der Anwendung, Datenbank, Dateispeicher, E-Mail-Versand, KI-Dokumentenverarbeitung (Extraktion &amp; Texterkennung)</td><td>Paris (FR)</td><td><a href="https://www.scaleway.com/en/privacy-policy/" target="_blank" rel="noopener">scaleway.com/en/privacy-policy</a></td></tr>
 <tr><td>Calendly LLC</td><td>Terminbuchung für Beratungsgespräche (nur bei Nutzung des Buchungs-Widgets)</td><td>USA</td><td><a href="https://calendly.com/privacy" target="_blank" rel="noopener">calendly.com/privacy</a></td></tr>
 </table>
 <p>Mit allen Auftragsverarbeitern bestehen Verträge gemäß Art. 28 DSGVO (AVV). Rechtsgrundlage der Terminbuchung über Calendly ist Art. 6 Abs. 1 lit. b DSGVO (vorvertragliche Maßnahme); für das Laden des Widgets Ihre Einwilligung (Art. 6 Abs. 1 lit. a DSGVO i. V. m. § 25 Abs. 1 TDDDG).</p>
@@ -96,12 +93,12 @@
 <ul>
     <li><strong>Scaleway (Hosting, Datenbank, Dateispeicher, E-Mail-Versand):</strong> Region <code>fr-par</code> -- Rechenzentren in Vitry-sur-Seine, Saint-Ouen-l’Aumône und Paris, Frankreich
     </li>
-<li><strong>Mistral AI (KI-Dokumentenverarbeitung):</strong> EU-Endpunkt des Anbieters, Verarbeitung innerhalb der Europäischen Union
+<li><strong>Scaleway Generative APIs (KI-Dokumentenverarbeitung):</strong> Rechenzentrum in Paris, Frankreich; Zero Data Retention
 </li>
 </ul>
 <p>Die Website auto-azav.de selbst wird als statische Seite über das Content-Delivery-Netzwerk von Scaleway (Edge Services) ausgeliefert; die dabei anfallenden technisch notwendigen Zugriffsdaten (z. B. IP-Adressen) werden innerhalb der EU verarbeitet. Bei Nutzung der Terminbuchung werden die von Ihnen eingegebenen Daten (Name, E-Mail, Terminwunsch) durch Calendly LLC (USA) verarbeitet.</p>
 <p>Die Übermittlung von Terminbuchungsdaten an die Calendly LLC (USA) stützt sich auf den Angemessenheitsbeschluss der EU-Kommission zum EU-US Data Privacy Framework (Art. 45 DSGVO); Calendly ist unter dem DPF zertifiziert. Ergänzend gelten EU-Standardvertragsklauseln (Art. 46 Abs. 2 lit. c DSGVO).</p>
-<p>Scaleway SAS und Mistral AI SAS sind Unternehmen mit Sitz in Frankreich; die Verarbeitung erfolgt nach deren vertraglichen Zusicherungen innerhalb der Europäischen Union. Soweit ein Anbieter im Einzelfall Unterauftragnehmer außerhalb der EU einsetzt, stützt sich dies auf EU-Standardvertragsklauseln (Art. 46 Abs. 2 lit. c DSGVO).</p>
+<p>Scaleway SAS ist ein Unternehmen mit Sitz in Frankreich; die Verarbeitung erfolgt nach dessen vertraglichen Zusicherungen vollständig innerhalb der Europäischen Union. Soweit der Anbieter im Einzelfall Unterauftragnehmer außerhalb der EU einsetzt, stützt sich dies auf EU-Standardvertragsklauseln (Art. 46 Abs. 2 lit. c DSGVO).</p>
 <h2>Aufbewahrungsfristen</h2>
 <p>Wir speichern Ihre personenbezogenen Daten nur so lange, wie es für die Erfüllung des jeweiligen Verarbeitungszwecks erforderlich ist oder gesetzliche Aufbewahrungspflichten bestehen:</p>
 <ul>
@@ -125,7 +122,7 @@
 <h2>Datenschutz durch Technikgestaltung (Art. 24, 25 &amp; 32 DSGVO)</h2>
 <p>Die Admination UG setzt umfassende technische und organisatorische Maßnahmen (TOM) gemäß Art. 32 DSGVO ein. Hierzu gehören insbesondere:</p>
 <ul>
-    <li><strong>Privacy by Design:</strong> Keine Tracking-, Werbe- oder Analysedienste von Drittanbietern in der Anwendung. Dokumente werden ausschließlich zur auftragsgegenständlichen Verarbeitung an den KI-Dienst (Mistral AI) übermittelt; der Anbieter verwendet diese Daten nach seinen vertraglichen Garantien nicht zum Training seiner KI-Modelle und speichert sie nicht über die Beantwortung der Anfrage hinaus.
+    <li><strong>Privacy by Design:</strong> Keine Tracking-, Werbe- oder Analysedienste von Drittanbietern in der Anwendung. Dokumente werden ausschließlich zur auftragsgegenständlichen Verarbeitung an den KI-Dienst des Cloud-Anbieters (Scaleway Generative APIs, Paris) übermittelt; nach den Zusicherungen des Anbieters werden Ein- und Ausgaben nicht gespeichert, nicht gelesen und nicht zum Training von KI-Modellen verwendet (Zero Data Retention).
     </li>
 <li><strong>Verschlüsselung:</strong> TLS 1.2/1.3 für alle Datenübertragungen, AES-256 für ruhende Daten im Dateispeicher; produktive Datenbank nur über ein privates Netzwerk erreichbar.
     </li>
