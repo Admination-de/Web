@@ -503,8 +503,8 @@ jobs:
             echo "::error::CLAUDE.md is a symlink — it must be a real file containing the @import line, not a link."
             exit 1
           fi
-          if ! printf '%s\n' '@../../Operation/Instruction/agent/Web.md' | cmp -s - CLAUDE.md; then
-            echo "::error::CLAUDE.md does not contain exactly the expected import line '@../../Operation/Instruction/agent/Web.md' plus a trailing newline, and nothing else."
+          if ! printf '%s\n' '@../../Information/Instruction/agent/Web.md' | cmp -s - CLAUDE.md; then
+            echo "::error::CLAUDE.md does not contain exactly the expected import line '@../../Information/Instruction/agent/Web.md' plus a trailing newline, and nothing else."
             exit 1
           fi
           echo "protocol-gate: CLAUDE.md is a real file with exactly the expected @import line."
