@@ -404,12 +404,11 @@ jobs:
         shell: bash
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           fail=0
 
-          new="$(comm -13 <(git ls-tree --name-only "$BASE_SHA" | sort) <(git ls-tree --name-only "$HEAD_SHA" | sort))"
+          new="$(comm -13 <(git ls-tree --name-only "$BASE_SHA" | sort) <(git ls-tree --name-only HEAD | sort))"
           if [ -n "$new" ]; then
             echo "::error::new top-level entries in Web - the scope fence forbids this, and Web is a PUBLIC repo; send another repo's change to its specialist instead:"
             printf '%s\n' "$new"
@@ -418,7 +417,7 @@ jobs:
 
           # Belt and braces: the tracked tree must be clean of repo roots too, so a
           # fence breach cannot survive by predating the PR that would have caught it.
-          existing="$(git ls-tree -r "$HEAD_SHA" | awk '$1=="160000"{print $4}'; git ls-tree -r --name-only "$HEAD_SHA" | grep -E '^.+/\.github/' || true)"
+          existing="$(git ls-tree -r HEAD | awk '$1=="160000"{print $4}'; git ls-tree -r --name-only HEAD | grep -E '^.+/\.github/' || true)"
           if [ -n "$existing" ]; then
             echo "::error::other repos' roots tracked in Web:"
             printf '%s\n' "$existing"
