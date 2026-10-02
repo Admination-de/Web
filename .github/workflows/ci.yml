@@ -382,10 +382,14 @@ jobs:
           echo "format-law: every newly added file is .html/.css, a per-repo named file, or covered by a universal allowance."
 
   # ---------------------------------------------------------------------------
-  # Scope fence, server side. The eight sibling repos are never vendored here;
-  # cross-repo work goes through that repo's own specialist and its own PR. This
-  # repo is PUBLIC, so a vendored sibling path would not merely break the fence —
-  # it would publish a private repo's contents.
+  # Scope fence, server side. Other repos are never vendored here; cross-repo
+  # work goes through that repo's own specialist and its own PR. This repo is
+  # PUBLIC, so a vendored repo path would not merely break the fence - it would
+  # publish a private repo's contents. The fence copies no repo list: Web's own
+  # top-level entries on the base branch are the allowlist, and a repo root is
+  # recognised by its shape (a gitlink or a nested .github/). New pages go into
+  # the existing pages/ folder; a new top-level entry needs the captain to lift
+  # repo-fence from staging's required checks for that one PR.
   # ---------------------------------------------------------------------------
   repo-fence:
     name: repo-fence
@@ -396,29 +400,27 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: No sibling-repo paths in this tree
+      - name: No other repo's paths in this tree
         shell: bash
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          SIBLINGS='^(Handler|Interface|Data|Compute|Generation|Storage|Plugin|Knowledge|Verification|Instruction|Contract|Templates|Web)/'
+          git cat-file -e HEAD^{commit} && git cat-file -e "$BASE_SHA^{commit}" || exit 1
           fail=0
 
-          added="$(git diff --name-only --diff-filter=AR "$BASE_SHA" "$HEAD_SHA" || true)"
-          vendored="$(printf '%s\n' "$added" | grep -E "$SIBLINGS" || true)"
-          if [ -n "$vendored" ]; then
-            echo "::error::sibling-repo paths added to Web — the scope fence forbids this, and Web is a PUBLIC repo; send the change to that repo's specialist instead:"
-            printf '%s\n' "$vendored"
+          new="$(comm -13 <(git ls-tree --name-only "$BASE_SHA" | sort) <(git ls-tree --name-only HEAD | sort))"
+          if [ -n "$new" ]; then
+            echo "::error::new top-level entries in Web - the scope fence forbids this, and Web is a PUBLIC repo; send another repo's change to its specialist instead:"
+            printf '%s\n' "$new"
             fail=1
           fi
 
-          # Belt and braces: the tracked tree must be clean of them too, so a fence
-          # breach cannot survive by predating the PR that would have caught it.
-          existing="$(git ls-files | grep -E "$SIBLINGS" || true)"
+          # Belt and braces: the tracked tree must be clean of repo roots too, so a
+          # fence breach cannot survive by predating the PR that would have caught it.
+          existing="$(git ls-tree -r HEAD | awk '$1=="160000"{print $4}'; git ls-tree -r --name-only HEAD | grep -E '^.+/\.github/' || true)"
           if [ -n "$existing" ]; then
-            echo "::error::sibling-repo paths already tracked in Web:"
+            echo "::error::other repos' roots tracked in Web:"
             printf '%s\n' "$existing"
             fail=1
           fi
