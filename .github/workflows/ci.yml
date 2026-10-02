@@ -406,7 +406,7 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
-          git rev-parse --verify --quiet HEAD "$BASE_SHA^{commit}" >/dev/null || exit 1
+          git cat-file -e HEAD^{commit} && git cat-file -e "$BASE_SHA^{commit}" || exit 1
           fail=0
 
           new="$(comm -13 <(git ls-tree --name-only "$BASE_SHA" | sort) <(git ls-tree --name-only HEAD | sort))"
