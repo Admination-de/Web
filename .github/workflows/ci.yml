@@ -470,19 +470,10 @@ jobs:
           exit "$fail"
 
   # ---------------------------------------------------------------------------
-  # Pilot of the central-instruction @import pattern (Instruction repo,
-  # agent/Web.md). The prior approach — a tracked SYMLINK entry at
-  # .claude/rules/protocol.md pointing outside the repo root — is silently
-  # skipped by Claude Code 2.1.263: measured headless with canary tokens and
-  # confirmed interactively (no approval dialog offered, rule absent from
-  # context). The working mechanism is a one-line root CLAUDE.md using
-  # Claude Code's documented `@import` syntax: it triggers the "Allow
-  # external CLAUDE.md file imports?" dialog naming the exact target, and
-  # once approved the session reads the real protocol at
-  # Instruction/agent/Web.md. This job validates that CLAUDE.md is a real,
-  # exact-content file (never a symlink) and that no second instruction file
-  # — an AGENTS.md at any depth, a nested CLAUDE.md other than the root one,
-  # or the removed protocol.md symlink — is tracked alongside it.
+  # No agent instruction file in this repo: Web's notes live in the central
+  # rules tree in Instruction (rules/Communication/Web.md), linked in locally
+  # as CLAUDE.local.md. This job fails if a CLAUDE.md, an AGENTS.md or the
+  # removed protocol.md symlink is tracked at any depth.
   # ---------------------------------------------------------------------------
   protocol-gate:
     name: protocol-gate
@@ -490,24 +481,6 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-
-      - name: CLAUDE.md is a real file with exactly the expected import line
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ ! -f CLAUDE.md ]; then
-            echo "::error::CLAUDE.md is missing at the repo root — the protocol is reached via a one-line @import there."
-            exit 1
-          fi
-          if [ -L CLAUDE.md ]; then
-            echo "::error::CLAUDE.md is a symlink — it must be a real file containing the @import line, not a link."
-            exit 1
-          fi
-          if ! printf '%s\n' '@../../Information/Instruction/agent/Web.md' | cmp -s - CLAUDE.md; then
-            echo "::error::CLAUDE.md does not contain exactly the expected import line '@../../Information/Instruction/agent/Web.md' plus a trailing newline, and nothing else."
-            exit 1
-          fi
-          echo "protocol-gate: CLAUDE.md is a real file with exactly the expected @import line."
 
       - name: No AGENTS.md file anywhere in the tree
         shell: bash
@@ -521,17 +494,17 @@ jobs:
           fi
           echo "protocol-gate: no AGENTS.md tracked."
 
-      - name: No CLAUDE.md other than the root one
+      - name: No CLAUDE.md file anywhere in the tree
         shell: bash
         run: |
           set -euo pipefail
-          hits="$(git ls-files | grep -E '(^|/)CLAUDE\.md$' | grep -vx 'CLAUDE.md' || true)"
+          hits="$(git ls-files | grep -E '(^|/)CLAUDE\.md$' || true)"
           if [ -n "$hits" ]; then
-            echo "::error::A nested CLAUDE.md is tracked — instructions come only from the root CLAUDE.md's one-line @import, never a second file at any depth:"
+            echo "::error::CLAUDE.md is tracked in this repo - agent instructions live in the central rules tree in Instruction, never in a repo file:"
             printf '%s\n' "$hits"
             exit 1
           fi
-          echo "protocol-gate: no nested CLAUDE.md tracked."
+          echo "protocol-gate: no CLAUDE.md tracked."
 
       - name: No leftover .claude/rules/protocol.md symlink
         shell: bash
@@ -539,7 +512,7 @@ jobs:
           set -euo pipefail
           hits="$(git ls-files | grep -Fx '.claude/rules/protocol.md' || true)"
           if [ -n "$hits" ]; then
-            echo "::error::.claude/rules/protocol.md is still tracked — the protocol is now reached via the root CLAUDE.md @import, not a symlink."
+            echo "::error::.claude/rules/protocol.md is still tracked — agent instructions live in the central rules tree in Instruction."
             exit 1
           fi
           echo "protocol-gate: .claude/rules/protocol.md is not tracked."
