@@ -387,9 +387,9 @@ jobs:
   # PUBLIC, so a vendored repo path would not merely break the fence - it would
   # publish a private repo's contents. The fence copies no repo list: Web's own
   # top-level entries on the base branch are the allowlist, and a repo root is
-  # recognised by its shape (a gitlink or a nested .github/). A legitimate new
-  # top-level entry lands in its own PR that adds only that entry and is merged
-  # by an admin past this check.
+  # recognised by its shape (a gitlink or a nested .github/). New pages go into
+  # the existing pages/ folder; a new top-level entry needs the captain to lift
+  # repo-fence from staging's required checks for that one PR.
   # ---------------------------------------------------------------------------
   repo-fence:
     name: repo-fence
@@ -406,6 +406,7 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
+          git rev-parse --verify --quiet HEAD "$BASE_SHA^{commit}" >/dev/null || exit 1
           fail=0
 
           new="$(comm -13 <(git ls-tree --name-only "$BASE_SHA" | sort) <(git ls-tree --name-only HEAD | sort))"
