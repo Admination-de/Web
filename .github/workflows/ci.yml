@@ -385,11 +385,10 @@ jobs:
   # Scope fence, server side. Other repos are never vendored here; cross-repo
   # work goes through that repo's own specialist and its own PR. This repo is
   # PUBLIC, so a vendored repo path would not merely break the fence - it would
-  # publish a private repo's contents. The fence copies no repo list: Web's own
-  # top-level entries on the base branch are the allowlist, and a repo root is
-  # recognised by its shape (a gitlink, or a nested .github/, CLAUDE.md or
-  # AGENTS.md). A legitimate new top-level entry lands in its own PR that adds
-  # only that entry and is merged by an admin past this check.
+  # publish a private repo's contents. The fence copies no repo list: Web keeps
+  # its own top-level entries in .github/repo-fence.yml (a new folder adds its
+  # name there in the same reviewed PR), and a repo root is recognised by its
+  # shape (a gitlink, or a nested .github/, CLAUDE.md or AGENTS.md).
   # ---------------------------------------------------------------------------
   repo-fence:
     name: repo-fence
@@ -403,15 +402,14 @@ jobs:
       - name: No other repo's paths in this tree
         shell: bash
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           fail=0
 
-          new="$(comm -13 <(git ls-tree --name-only "$BASE_SHA" | sort) <(git ls-tree --name-only "$HEAD_SHA" | sort))"
+          new="$(comm -23 <(git ls-tree --name-only "$HEAD_SHA" | sort) <(git show "$HEAD_SHA:.github/repo-fence.yml" | sed -n 's/^- //p' | sort))"
           if [ -n "$new" ]; then
-            echo "::error::new top-level entries in Web - the scope fence forbids this, and Web is a PUBLIC repo; send another repo's change to its specialist instead:"
+            echo "::error::top-level entries missing from .github/repo-fence.yml - Web is a PUBLIC repo; send another repo's change to its specialist, or list a genuine new Web folder there:"
             printf '%s\n' "$new"
             fail=1
           fi

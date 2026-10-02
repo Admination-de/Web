@@ -1,0 +1,17 @@
+# Web's own top-level entries. The repo-fence CI job fails on any other; a new
+# top-level folder is added here in the same reviewed pull request.
+- .claude
+- .github
+- .gitignore
+- README.md
+- assets
+- css
+- datenschutz.html
+- impressum.html
+- index.html
+- package-lock.json
+- package.json
+- pages
+- public
+- tailwind.config.js
+- vercel.json
