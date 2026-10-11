@@ -1,0 +1,520 @@
+name: CI
+
+# Web is the PUBLIC website — lower-interior slot of the Architecture Grid
+# (deployment-world; triple Web / .html / Vercel), primary formats .html and
+# .css, mode strict (knowledge: architecture/format-law, application.web/identity).
+#
+# The repo carries no test framework and must not grow one. Its real gate is the
+# same command Vercel runs on every deploy (vercel.json buildCommand), plus the
+# integrity of the documents it ships. Every check below is INLINE BY DESIGN: a
+# separate scripts/*.sh or *.js file would itself violate the format law this
+# workflow enforces. bash, node and python3 all ship on the ubuntu-latest image.
+#
+# Check names (these feed the branch-protection required-checks list):
+#   site-build · html-gate · format-law · repo-fence · hygiene · protocol-gate
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # The repo's OWN gate: the exact build Vercel runs (vercel.json buildCommand
+  # -> npm run build:css). If this fails, the deploy fails; nothing else about
+  # the PR matters until it passes.
+  #
+  # `npm ci`, not `npm install`: package-lock.json is committed, so the whole
+  # dependency tree is pinned and an upstream release can no longer turn this job
+  # red without a commit. npm ci is also strictly the stricter of the two — it
+  # installs the lockfile exactly and FAILS if package.json and the lockfile have
+  # drifted apart, which npm install would silently reconcile by rewriting the
+  # lockfile. That drift check is the point: it stabilises this gate's contract
+  # (knowledge: architecture/gate-contract-stability).
+  # ---------------------------------------------------------------------------
+  site-build:
+    name: site-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          # `cache: npm` is now possible (the lockfile is committed) but deliberately
+          # not enabled here — a cache is a second input to the gate, and adding one
+          # belongs in its own reviewed change, not in the switch to npm ci.
+
+      - name: Install dependencies (from the committed lockfile)
+        run: npm ci --no-audit --no-fund
+
+      - name: Build the site (the command Vercel runs)
+        run: npm run build:css
+
+      - name: The build actually emitted a stylesheet
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -s css/main.css ]; then
+            echo "::error::npm run build:css exited 0 but css/main.css is missing or empty."
+            exit 1
+          fi
+          if ! grep -q '{' css/main.css; then
+            echo "::error::css/main.css contains no CSS rules — the Tailwind build produced nothing usable."
+            exit 1
+          fi
+          echo "site-build: css/main.css built ($(wc -c < css/main.css) bytes)."
+
+  # ---------------------------------------------------------------------------
+  # The repo's second gate: this is a website, so its documents have to hold
+  # together. A public page that 404s its own privacy policy is both a bad page
+  # and, in Germany, a legal problem — Impressumspflicht (§5 DDG) and the DSGVO
+  # information duty both require these pages to be reachable from the site.
+  # Their WORDING is owned by the Contract specialist; their EXISTENCE is
+  # checked here.
+  # ---------------------------------------------------------------------------
+  html-gate:
+    name: html-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: The legally required pages exist and are linked
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail=0
+          for page in datenschutz.html impressum.html; do
+            if [ ! -s "$page" ]; then
+              echo "::error::$page is missing or empty — this site may not ship without it."
+              fail=1
+              continue
+            fi
+            # cleanUrls is on (vercel.json), so pages link to /datenschutz, not
+            # /datenschutz.html. A page linking to ITSELF does not make it reachable,
+            # so the search set is every OTHER page.
+            slug="${page%.html}"
+            others="$(git ls-files '*.html' | grep -vxF "$page" || true)"
+            if [ -z "$others" ] || ! grep -qE -e "href=\"/?${slug}(\.html)?\"" -- $others; then
+              echo "::error::no other page on this site links to $page — a required page that cannot be reached is not published."
+              fail=1
+            fi
+          done
+          exit "$fail"
+
+      - name: Every page is a well-formed document
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail=0
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            if ! head -c 512 -- "$f" | grep -qi '<!doctype html'; then
+              echo "::error file=$f,line=1::page does not open with <!DOCTYPE html>."
+              fail=1
+            fi
+            grep -qiE -e '<html[^>]*[[:space:]]lang=' -- "$f" || {
+              echo "::error file=$f,line=1::<html> carries no lang attribute — screen readers and search engines both need it."
+              fail=1
+            }
+            grep -qiE -e '<meta[^>]*charset=' -- "$f" || {
+              echo "::error file=$f,line=1::page declares no <meta charset> — German umlauts will mojibake."
+              fail=1
+            }
+            grep -qiE -e '<title>[^<]*[^[:space:]<][^<]*</title>' -- "$f" || {
+              echo "::error file=$f,line=1::page has no non-empty <title>."
+              fail=1
+            }
+          done < <(git ls-files '*.html')
+          exit "$fail"
+
+      - name: No insecure (http://) subresources or links
+        shell: bash
+        run: |
+          set -euo pipefail
+          hits="$(grep -nE -e '(href|src)="http://' -- $(git ls-files '*.html') || true)"
+          if [ -n "$hits" ]; then
+            echo "::error::plain-http references on a public HTTPS site — browsers block them as mixed content:"
+            printf '%s\n' "$hits"
+            exit 1
+          fi
+          echo "html-gate: no plain-http references."
+
+      - name: Every local link and asset resolves
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os, re, subprocess, sys
+
+          pages = subprocess.run(
+              ["git", "ls-files", "*.html"], capture_output=True, text=True, check=True
+          ).stdout.split()
+          tracked = set(
+              subprocess.run(["git", "ls-files"], capture_output=True, text=True, check=True)
+              .stdout.split()
+          )
+
+          REF = re.compile(r'(?:href|src)\s*=\s*"([^"]*)"', re.I)
+          ID = re.compile(r'\bid\s*=\s*"([^"]*)"', re.I)
+          EXTERNAL = ("http://", "https://", "mailto:", "tel:", "//", "data:", "javascript:")
+          bad = 0
+
+          def exists(rel):
+              # tracked, or produced by the build (css/main.css, public/dhws-data-injector.js)
+              return rel in tracked or os.path.exists(rel)
+
+          for page in pages:
+              text = open(page, encoding="utf-8", errors="replace").read()
+              ids = set(ID.findall(text))
+              for lineno, line in enumerate(text.splitlines(), 1):
+                  for target in REF.findall(line):
+                      t = target.strip()
+                      if not t or t.startswith(EXTERNAL):
+                          continue
+                      if t.startswith("#"):
+                          anchor = t[1:]
+                          if anchor and anchor not in ids:
+                              print(
+                                  f'::error file={page},line={lineno}::dead in-page anchor "{t}" — '
+                                  f'no element with id="{anchor}" on this page.'
+                              )
+                              bad += 1
+                          continue
+                      path = t.partition("#")[0].split("?", 1)[0]
+                      if not path:
+                          continue
+                      if path.startswith("/"):
+                          rel = path.lstrip("/") or "index.html"
+                      else:
+                          rel = os.path.normpath(os.path.join(os.path.dirname(page), path))
+                      if rel.startswith(".."):
+                          print(
+                              f"::error file={page},line={lineno}::reference '{t}' points outside "
+                              "the repo root."
+                          )
+                          bad += 1
+                          continue
+                      if exists(rel):
+                          continue
+                      # vercel.json sets cleanUrls: true — "/datenschutz" is served from
+                      # datenschutz.html, so an extensionless path resolves that way too.
+                      if not os.path.splitext(rel)[1] and exists(rel + ".html"):
+                          continue
+                      if exists(os.path.join(rel, "index.html")):
+                          continue
+                      print(f"::error file={page},line={lineno}::broken local reference: {t}")
+                      bad += 1
+
+          if bad:
+              sys.exit(1)
+          print(f"html-gate: every local link and asset across {len(pages)} pages resolves.")
+          PY
+
+  # ---------------------------------------------------------------------------
+  # Server-side mirror of the plugin PreToolUse hook `format-law.sh`
+  # (knowledge: architecture/format-law). Web's law: primary formats .html and
+  # .css, mode strict, plus the named file tailwind.config.js. Application rules
+  # from the same document: creation is policed, edits are not, existing files
+  # grandfathered — hence --diff-filter=AR.
+  #
+  # DELIBERATE LOOSENING (2026-08-29). The three allowance arms below — .css,
+  # tailwind.config.js and .github/CODEOWNERS — make this gate strictly LESS
+  # strict than it was. That is the point, and it is disclosed rather than
+  # smuggled in: this job had drifted BEHIND the law it mirrors. The hook reads
+  # architecture.json live and already allowed all three, while this job's
+  # hardcoded copy still rejected them — so the keyboard said yes and the PR said
+  # no. The comment that used to sit here asserted the opposite ("the hook denies
+  # extensionless files under .github/, the ruling is pending"); both halves were
+  # false by then. Authorised by Knowledge 1514d3a (2026-08-28, architect
+  # ruling): seed architecture.json, format-law doc — universal_allowances.files
+  # gained the .github/ platform-convention entry, and per_repo.Web became
+  # formats [.html, .css] + files [tailwind.config.js].
+  #
+  # The loosening is BOUNDED to that policy text, mirroring path-policy.sh arm
+  # for arm rather than approximating it. In particular CODEOWNERS is keyed on
+  # the exact NAME under a .github/ directory — NOT on "extensionless files under
+  # .github/". .github/FOOBAR, .github/codeowners (case) and a root-level
+  # CODEOWNERS all remain violations. .js as a class remains a violation too;
+  # only the single named file tailwind.config.js is allowed.
+  #
+  # Still grandfathered rather than allowanced, because the law polices creation
+  # and not edits: css/tailwind.css and css/main.css (now also covered by the
+  # .css arm) and public/favicon.ico (not covered — a NEW .ico outside an
+  # allowanced asset path is still a violation).
+  # ---------------------------------------------------------------------------
+  format-law:
+    name: format-law
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Enforce the format law on newly added files
+        shell: bash
+        env:
+          # refs arrive through env, never inline ${{ }} interpolation into shell text
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -uo pipefail
+          violations=()
+
+          # A (created) and R (renamed — the target path did not exist either, which
+          # is exactly the hook's "file does not exist yet" test).
+          while IFS= read -r -d '' path; do
+            [ -z "$path" ] && continue
+
+            # Reject any path carrying a literal ".." segment outright, before any
+            # allowance can match it — mirrors the hook's REL_HAS_DOTDOT hard-reject.
+            case "/$path/" in
+              */../*)
+                violations+=("$path (path escapes repo root)")
+                continue
+                ;;
+            esac
+
+            filename="$(basename -- "$path")"
+            lower_ext=""
+            case "$filename" in
+              *.*) lower_ext=".${filename##*.}" ;;
+            esac
+            lower_ext="$(printf '%s' "$lower_ext" | tr '[:upper:]' '[:lower:]')"
+
+            pass=0
+
+            # --- universal allowances (verbatim from the hook's universal_allow) ---
+
+            # named files
+            case "$filename" in
+              CLAUDE.md|README.md|.gitignore) pass=1 ;;
+            esac
+
+            # paired narrative docs: any markdown file
+            [ "$pass" -eq 0 ] && [ "$lower_ext" = ".md" ] && pass=1
+
+            # .claude/** path
+            if [ "$pass" -eq 0 ]; then
+              case "$path" in
+                .claude/*|*/.claude/*) pass=1 ;;
+              esac
+            fi
+
+            # .yml/.yaml under .github/ (Workflow corner)
+            if [ "$pass" -eq 0 ]; then
+              case "$path" in
+                .github/*|*/.github/*)
+                  case "$lower_ext" in .yml|.yaml) pass=1 ;; esac
+                  ;;
+              esac
+            fi
+
+            # Well-known extensionless GitHub platform-convention files under
+            # .github/ — CODEOWNERS by exact, case-sensitive name. Mirrors the
+            # files[] arm of pp_universal_allow_policy: the path test and the
+            # basename test must BOTH hold, so this admits .github/CODEOWNERS and
+            # nothing else.
+            if [ "$pass" -eq 0 ]; then
+              case "$path" in
+                .github/*|*/.github/*)
+                  case "$filename" in
+                    CODEOWNERS) pass=1 ;;
+                  esac
+                  ;;
+              esac
+            fi
+
+            # .spec (Testing corner)
+            if [ "$pass" -eq 0 ]; then
+              case "$filename" in
+                *.spec.*|*.spec) pass=1 ;;
+              esac
+            fi
+
+            # .json configs/contracts (the center)
+            [ "$pass" -eq 0 ] && [ "$lower_ext" = ".json" ] && pass=1
+
+            # path-scoped binary assets
+            if [ "$pass" -eq 0 ]; then
+              case "$path" in
+                */templates/*|templates/*|*/fonts/*|fonts/*|*/fixtures/*|fixtures/*|*/assets/*|assets/*)
+                  case "$lower_ext" in
+                    .png|.jpg|.jpeg|.gif|.svg|.ico|.pdf|.ttf|.otf|.woff|.woff2) pass=1 ;;
+                  esac
+                  ;;
+              esac
+            fi
+
+            # --- per-repo primary formats: .html, .css ---
+            if [ "$pass" -eq 0 ]; then
+              case "$lower_ext" in .html|.css) pass=1 ;; esac
+            fi
+
+            # --- per-repo named files: exact, case-sensitive basename, no globs.
+            # Mirrors repo_law.files in pp_format_law_decision. Deliberately a
+            # single name and NOT a blanket .js allowance.
+            if [ "$pass" -eq 0 ]; then
+              case "$filename" in
+                tailwind.config.js) pass=1 ;;
+              esac
+            fi
+
+            [ "$pass" -eq 0 ] && violations+=("$path")
+          done < <(git diff -z --name-only --diff-filter=AR "$BASE_SHA" "$HEAD_SHA")
+
+          if [ "${#violations[@]}" -gt 0 ]; then
+            for v in "${violations[@]}"; do
+              echo "::error::format-law violation: $v"
+            done
+            echo "Web's primary formats are [.html, .css] (mode: strict), plus tailwind.config.js and the universal allowances — knowledge: architecture/format-law."
+            exit 1
+          fi
+
+          echo "format-law: every newly added file is .html/.css, a per-repo named file, or covered by a universal allowance."
+
+  # ---------------------------------------------------------------------------
+  # Scope fence, server side. Other repos are never vendored here; cross-repo
+  # work goes through that repo's own specialist and its own PR. This repo is
+  # PUBLIC, so a vendored repo path would not merely break the fence - it would
+  # publish a private repo's contents. The fence copies no repo list: Web's own
+  # top-level entries on the base branch are the allowlist, and a repo root is
+  # recognised by its shape (a gitlink or a nested .github/). New pages go into
+  # the existing pages/ folder; a new top-level entry needs the captain to lift
+  # repo-fence from staging's required checks for that one PR.
+  # ---------------------------------------------------------------------------
+  repo-fence:
+    name: repo-fence
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: No other repo's paths in this tree
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          git cat-file -e HEAD^{commit} && git cat-file -e "$BASE_SHA^{commit}" || exit 1
+          fail=0
+
+          new="$(comm -13 <(git ls-tree --name-only "$BASE_SHA" | sort) <(git ls-tree --name-only HEAD | sort))"
+          if [ -n "$new" ]; then
+            echo "::error::new top-level entries in Web - the scope fence forbids this, and Web is a PUBLIC repo; send another repo's change to its specialist instead:"
+            printf '%s\n' "$new"
+            fail=1
+          fi
+
+          # Belt and braces: the tracked tree must be clean of repo roots too, so a
+          # fence breach cannot survive by predating the PR that would have caught it.
+          existing="$(git ls-tree -r HEAD | awk '$1=="160000"{print $4}'; git ls-tree -r --name-only HEAD | grep -E '^.+/\.github/' || true)"
+          if [ -n "$existing" ]; then
+            echo "::error::other repos' roots tracked in Web:"
+            printf '%s\n' "$existing"
+            fail=1
+          fi
+
+          exit "$fail"
+
+  # Web is a PUBLIC repository. GitHub does not let a public repo's workflow call
+  # a reusable workflow that lives in a PRIVATE repo, and Architecture is private
+  # (measured 2026-09-07: callers were rejected at parse time). So the fleet
+  # gates stay INLINE here until Architecture publishes them from a public repo;
+  # the other nine repos call gate-protocol.yml / gate-hygiene.yml.
+  # ---------------------------------------------------------------------------
+  # Junk and secret-bearing files must never enter history — checked against the
+  # whole tracked tree, not only the diff, so this cannot rot back in silently.
+  # This repo is PUBLIC: a committed .env is a disclosed credential, not a mess.
+  # ---------------------------------------------------------------------------
+  hygiene:
+    name: hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: No .DS_Store, node_modules or .env in the tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          JUNK='(^|/)(\.DS_Store|node_modules/|\.env(\.[A-Za-z0-9_.-]+)?$)'
+          hits="$(git ls-files | grep -E "$JUNK" || true)"
+          if [ -n "$hits" ]; then
+            echo "::error::junk or secret-bearing files are tracked in this repo:"
+            printf '%s\n' "$hits"
+            echo "Remove them with 'git rm --cached <path>' and add them to .gitignore."
+            exit 1
+          fi
+          echo "hygiene: no .DS_Store, node_modules or .env in the tracked tree."
+
+      - name: .gitignore still covers them
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail=0
+          for pattern in .DS_Store node_modules; do
+            if ! grep -qxF "$pattern" .gitignore; then
+              echo "::error file=.gitignore::'$pattern' is no longer ignored — that is how it gets committed next time."
+              fail=1
+            fi
+          done
+          exit "$fail"
+
+  # ---------------------------------------------------------------------------
+  # No agent instruction file in this repo: Web's notes live in the central
+  # rules tree in Instruction (rules/Communication/Web.md), linked in locally
+  # as CLAUDE.local.md. This job fails if a CLAUDE.md, an AGENTS.md or the
+  # removed protocol.md symlink is tracked at any depth.
+  # ---------------------------------------------------------------------------
+  protocol-gate:
+    name: protocol-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: No AGENTS.md file anywhere in the tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          hits="$(git ls-files | grep -E '(^|/)AGENTS\.md$' || true)"
+          if [ -n "$hits" ]; then
+            echo "::error::AGENTS.md is tracked in this repo — agent instructions live in the protocol source only, never in a second file:"
+            printf '%s\n' "$hits"
+            exit 1
+          fi
+          echo "protocol-gate: no AGENTS.md tracked."
+
+      - name: No CLAUDE.md file anywhere in the tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          hits="$(git ls-files | grep -E '(^|/)CLAUDE\.md$' || true)"
+          if [ -n "$hits" ]; then
+            echo "::error::CLAUDE.md is tracked in this repo - agent instructions live in the central rules tree in Instruction, never in a repo file:"
+            printf '%s\n' "$hits"
+            exit 1
+          fi
+          echo "protocol-gate: no CLAUDE.md tracked."
+
+      - name: No leftover .claude/rules/protocol.md symlink
+        shell: bash
+        run: |
+          set -euo pipefail
+          hits="$(git ls-files | grep -Fx '.claude/rules/protocol.md' || true)"
+          if [ -n "$hits" ]; then
+            echo "::error::.claude/rules/protocol.md is still tracked — agent instructions live in the central rules tree in Instruction."
+            exit 1
+          fi
+          echo "protocol-gate: .claude/rules/protocol.md is not tracked."
